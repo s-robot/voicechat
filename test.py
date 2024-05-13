@@ -1,0 +1,144 @@
+import asyncio
+import random
+import threading
+import time
+import wave
+from asyncio import Queue as AsyncQueue
+from datetime import datetime
+from threading import Thread
+
+import pyaudio
+import simpleaudio as sa
+import speech_recognition as sr
+
+from gpt_service import GptService
+from vox_service import VoxService
+
+FORMAT = pyaudio.paInt16
+SAMPLE_RATE = 44100  # サンプリングレート
+CHANNELS = 1  # モノラルかバイラルか
+INPUT_DEVICE_INDEX = 1  # マイクのチャンネル
+CALL_BACK_FREQUENCY = 1  # コールバック呼び出しの周期[sec]
+
+
+OUTPUT_TXT_FILE = "./" + datetime.now().strftime("%Y%m%d_%H_%M") + ".txt"  # テキストファイルのファイル名を日付のtxtファイルにする
+gs = GptService()
+vs = VoxService()
+
+
+def look_for_audio_input():
+    """
+    オーディオIF一覧
+    """
+    pa = pyaudio.PyAudio()
+
+    for i in range(pa.get_device_count()):
+        print(pa.get_device_info_by_index(i))
+        print()
+
+    pa.terminate()
+
+
+def play_fill():
+    fillvoices = ["そっかそっか", "そうかぁー", "そうだねー", "えっとぉー", "えっとねぇー", "うーんとね"]
+    wave_obj = sa.WaveObject.from_wave_file(f"fill_voice/{random.choice(fillvoices)}.wav")
+    play_obj = wave_obj.play()
+    play_obj.wait_done()
+
+
+async def play_chat(file):
+    wave_obj = sa.WaveObject.from_wave_file(file)
+    play_obj = wave_obj.play()
+    play_obj.wait_done()
+
+
+def fetch_voice(q: AsyncQueue, text, index):
+    result = vs.voxvoice(text, 0)
+    q.put_nowait((index, result))
+    print(f"Fetched voice for index {index}")
+
+
+def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, threads: list[Thread], error_queue: AsyncQueue):
+    text: str = ""
+    try:
+        text = recog.recognize_google(audio, language="ja-JP")
+    except:
+        error_queue.put_nowait("🐙🙉聞き取りエラー🙉🐙")
+
+    if text == "":
+        error_queue.put_nowait("🐙🙉聞き取りエラー🙉🐙")
+        return
+
+    print(f"user: {text}")
+
+    if text in "じゃあね" or text in "またね" or text in "バイバイ":
+        error_queue.put_nowait("👋see you!!👋")
+        return
+
+    res = gs.chat(text, prompt="あなたはuserの友達のIT系大学生「ソータ」として振る舞ってください。若い女の子の口調で、一人称は「ソータ」です。", model="gpt-3.5-turbo-0125")
+    index = 0
+    result = ""
+    for text in res:
+        print(f"Text fetched: {text}")
+        result += text
+        thread = threading.Thread(target=fetch_voice, args=(queue, text, index))
+        threads.append(thread)
+        thread.start()
+        print(f"Add fetch thread for index {index}")
+        index += 1
+    gs.addres(result)
+
+
+async def process_text(recog: sr.Recognizer, audio: sr.AudioData):
+    queue: AsyncQueue = AsyncQueue()
+    error_queue: AsyncQueue = AsyncQueue()
+    threads: list[Thread] = []
+    played_indexes: set = set()
+
+    # テキストの取得スレッドを開始
+    threading.Thread(target=text_fetcher, args=(recog, audio, queue, threads, error_queue)).start()
+
+    # フェッチした音声を順に再生
+    isFirst = True
+    while isFirst and error_queue.empty():
+        play_fill()
+        while any(thread.is_alive() for thread in threads) or not queue.empty():
+            if not queue.empty():
+                fetched_index, file = queue.get_nowait()
+                if fetched_index == len(played_indexes):
+                    isFirst = False
+                    print(f"start play voice for index {fetched_index}")
+                    await play_chat(file)
+                    played_indexes.add(fetched_index)
+                else:
+                    queue.put_nowait((fetched_index, file))
+            await asyncio.sleep(0.1)
+    if not error_queue.empty():
+        while not error_queue.empty():
+            e = error_queue.get_nowait()
+            print(e)
+            if e == "👋see you!!👋":
+                raise Exception()
+
+
+async def realtime_textise():
+    # 音声入力
+    while True:
+        r = sr.Recognizer()
+        # r.non_speaking_duration = 0.2
+        # r.pause_threshold = 0.3
+        # r.phrase_threshold = 0.1
+
+        with sr.Microphone() as source:
+            print("発話どうぞ💬")
+            audio = r.listen(source)
+        await process_text(r, audio)
+
+
+async def main():
+    look_for_audio_input()
+    await realtime_textise()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
