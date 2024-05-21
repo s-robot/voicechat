@@ -35,8 +35,6 @@ class VoxService:
         except:
             pass
 
-        print(response1.json())
-
         # vox synth
         headers = {"Content-Type": "application/json"}
         try:

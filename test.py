@@ -157,6 +157,7 @@ async def realtime_textise():
     is_runing = True
     while is_runing:
         r = sr.Recognizer()
+        r.energy_threshold = 1000
         with sr.Microphone() as source:
             print("発話どうぞ💬")
             audio = r.listen(source)
