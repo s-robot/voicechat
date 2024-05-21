@@ -51,9 +51,9 @@ class VoxService:
 
         buff = io.BytesIO(response2.content)
         buff.seek(0)
-        wave_obj = sa.WaveObject.from_wave_file(buff)
-        play_obj = wave_obj.play()
-        play_obj.wait_done()
+        # wave_obj = sa.WaveObject.from_wave_file(buff)
+        # play_obj = wave_obj.play()
+        # play_obj.wait_done()
 
         # ローカルに保存する場合
         if save:
