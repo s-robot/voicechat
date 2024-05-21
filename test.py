@@ -12,8 +12,8 @@ import simpleaudio as sa
 import speech_recognition as sr
 
 from gpt_service import GptService
-from vox_service import VoxService
 from noun_service import noun_list
+from vox_service import VoxService
 
 FORMAT = pyaudio.paInt16
 SAMPLE_RATE = 44100  # サンプリングレート
@@ -118,7 +118,7 @@ def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, t
     gs.addres(result)
 
 
-async def process_text(recog: sr.Recognizer, audio: sr.AudioData):
+async def process_text(recog: sr.Recognizer, audio: sr.AudioData) -> bool:
     queue: AsyncQueue = AsyncQueue()
     filler_queue: AsyncQueue = AsyncQueue()
     error_queue: AsyncQueue = AsyncQueue()
@@ -148,17 +148,19 @@ async def process_text(recog: sr.Recognizer, audio: sr.AudioData):
         print(e)
         if e == "👋see you!!👋":
             await play_exit()
-            raise Exception()
+            return False
+    return True
 
 
 async def realtime_textise():
     # 音声入力
-    while True:
+    isRun = True
+    while isRun:
         r = sr.Recognizer()
         with sr.Microphone() as source:
             print("発話どうぞ💬")
             audio = r.listen(source)
-        await process_text(r, audio)
+        isRun = await process_text(r, audio)
 
 
 async def main():
