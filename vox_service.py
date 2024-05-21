@@ -35,6 +35,8 @@ class VoxService:
         except:
             pass
 
+        print(response1.json())
+
         # vox synth
         headers = {"Content-Type": "application/json"}
         try:
@@ -49,6 +51,9 @@ class VoxService:
 
         buff = io.BytesIO(response2.content)
         buff.seek(0)
+        wave_obj = sa.WaveObject.from_wave_file(buff)
+        play_obj = wave_obj.play()
+        play_obj.wait_done()
 
         # ローカルに保存する場合
         if save:
@@ -61,5 +66,5 @@ class VoxService:
 
 if __name__ == "__main__":
     vs = VoxService()
-    vs.speakers()
-    vs.voxvoice("", 0)
+    # vs.speakers()
+    vs.voxvoice("隣の客はよく柿食う客だ", 0)

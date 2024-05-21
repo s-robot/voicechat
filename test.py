@@ -13,6 +13,7 @@ import speech_recognition as sr
 
 from gpt_service import GptService
 from vox_service import VoxService
+from noun_service import noun_list
 
 FORMAT = pyaudio.paInt16
 SAMPLE_RATE = 44100  # サンプリングレート
@@ -39,9 +40,25 @@ def look_for_audio_input():
     pa.terminate()
 
 
-def play_fill():
+async def play_noun_or_fill(filler_queue: AsyncQueue):
+    if not filler_queue.empty():
+        fetched_index, file = filler_queue.get_nowait()
+        print(f"start play voice for index {fetched_index}")
+        await play_chat(file)
+    else:
+        await play_fill()
+
+
+async def play_fill():
     fillvoices = ["そっかそっか", "そうかぁー", "そうだねー", "えっとぉー", "えっとねぇー", "うーんとね"]
     wave_obj = sa.WaveObject.from_wave_file(f"fill_voice/{random.choice(fillvoices)}.wav")
+    play_obj = wave_obj.play()
+    play_obj.wait_done()
+
+
+async def play_exit():
+    exitvoices = ["じゃあね", "またね", "元気でね", "また話そうね", "バイバイ"]
+    wave_obj = sa.WaveObject.from_wave_file(f"fill_voice/{random.choice(exitvoices)}.wav")
     play_obj = wave_obj.play()
     play_obj.wait_done()
 
@@ -58,7 +75,18 @@ def fetch_voice(q: AsyncQueue, text, index):
     print(f"Fetched voice for index {index}")
 
 
-def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, threads: list[Thread], error_queue: AsyncQueue):
+def create_noun_fill(q: AsyncQueue, text, index):
+    nlist = noun_list(text)
+    print(nlist)
+    if len(nlist) > 0:
+        noun = random.choice(nlist)
+        nounfills = [f"あー{noun}かぁ", f"{noun}ねぇ", f"{noun}かぁ", f"{noun}の話ね", f"おー{noun}ね"]
+        nounfill = random.choice(nounfills)
+        threading.Thread(target=fetch_voice, args=(q, nounfill, index)).start()
+        print(f"Add fetch nounfill: {nounfill}")
+
+
+def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, threads: list[Thread], error_queue: AsyncQueue, filler_queue: AsyncQueue):
     text: str = ""
     try:
         text = recog.recognize_google(audio, language="ja-JP")
@@ -70,10 +98,11 @@ def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, t
         return
 
     print(f"user: {text}")
-
-    if text in "じゃあね" or text in "またね" or text in "バイバイ":
+    if "じゃあね" in text or "またね" in text or "バイバイ" in text:
         error_queue.put_nowait("👋see you!!👋")
         return
+
+    threading.Thread(target=create_noun_fill, args=(filler_queue, text, 999)).start()
 
     res = gs.chat(text, prompt="あなたはuserの友達のIT系大学生「ソータ」として振る舞ってください。若い女の子の口調で、一人称は「ソータ」です。", model="gpt-3.5-turbo-0125")
     index = 0
@@ -91,17 +120,18 @@ def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, t
 
 async def process_text(recog: sr.Recognizer, audio: sr.AudioData):
     queue: AsyncQueue = AsyncQueue()
+    filler_queue: AsyncQueue = AsyncQueue()
     error_queue: AsyncQueue = AsyncQueue()
     threads: list[Thread] = []
     played_indexes: set = set()
 
     # テキストの取得スレッドを開始
-    threading.Thread(target=text_fetcher, args=(recog, audio, queue, threads, error_queue)).start()
+    threading.Thread(target=text_fetcher, args=(recog, audio, queue, threads, error_queue, filler_queue)).start()
 
     # フェッチした音声を順に再生
     isFirst = True
     while isFirst and error_queue.empty():
-        play_fill()
+        await play_noun_or_fill(filler_queue)
         while any(thread.is_alive() for thread in threads) or not queue.empty():
             if not queue.empty():
                 fetched_index, file = queue.get_nowait()
@@ -113,22 +143,18 @@ async def process_text(recog: sr.Recognizer, audio: sr.AudioData):
                 else:
                     queue.put_nowait((fetched_index, file))
             await asyncio.sleep(0.1)
-    if not error_queue.empty():
-        while not error_queue.empty():
-            e = error_queue.get_nowait()
-            print(e)
-            if e == "👋see you!!👋":
-                raise Exception()
+    while not error_queue.empty():
+        e = error_queue.get_nowait()
+        print(e)
+        if e == "👋see you!!👋":
+            await play_exit()
+            raise Exception()
 
 
 async def realtime_textise():
     # 音声入力
     while True:
         r = sr.Recognizer()
-        # r.non_speaking_duration = 0.2
-        # r.pause_threshold = 0.3
-        # r.phrase_threshold = 0.1
-
         with sr.Microphone() as source:
             print("発話どうぞ💬")
             audio = r.listen(source)
