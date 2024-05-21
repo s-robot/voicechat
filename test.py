@@ -154,13 +154,13 @@ async def process_text(recog: sr.Recognizer, audio: sr.AudioData) -> bool:
 
 async def realtime_textise():
     # 音声入力
-    isRun = True
-    while isRun:
+    is_runing = True
+    while is_runing:
         r = sr.Recognizer()
         with sr.Microphone() as source:
             print("発話どうぞ💬")
             audio = r.listen(source)
-        isRun = await process_text(r, audio)
+        is_runing = await process_text(r, audio)
 
 
 async def main():
