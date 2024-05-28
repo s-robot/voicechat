@@ -1,10 +1,7 @@
 import asyncio
 import random
 import threading
-import time
-import wave
 from asyncio import Queue as AsyncQueue
-from datetime import datetime
 from threading import Thread
 
 import pyaudio
@@ -15,14 +12,6 @@ from gpt_service import GptService
 from noun_service import noun_list
 from vox_service import VoxService
 
-FORMAT = pyaudio.paInt16
-SAMPLE_RATE = 44100  # サンプリングレート
-CHANNELS = 1  # モノラルかバイラルか
-INPUT_DEVICE_INDEX = 1  # マイクのチャンネル
-CALL_BACK_FREQUENCY = 1  # コールバック呼び出しの周期[sec]
-
-
-OUTPUT_TXT_FILE = "./" + datetime.now().strftime("%Y%m%d_%H_%M") + ".txt"  # テキストファイルのファイル名を日付のtxtファイルにする
 gs = GptService()
 vs = VoxService()
 
