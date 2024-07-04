@@ -8,6 +8,7 @@ import pyaudio
 import simpleaudio as sa
 import speech_recognition as sr
 
+import settings
 from gpt_service import GptService
 from noun_service import noun_list
 from vox_service import VoxService
@@ -78,8 +79,9 @@ def create_noun_fill(q: AsyncQueue, text, index):
 def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, threads: list[Thread], error_queue: AsyncQueue, filler_queue: AsyncQueue):
     text: str = ""
     try:
-        text = recog.recognize_google(audio, language="ja-JP")
-    except:
+        text = recog.recognize_whisper_api(audio, model="whisper-1", api_key=settings.OPENAI_KEY)
+    except Exception as e:
+        print(f"Error: {e}")
         error_queue.put_nowait("🐙🙉聞き取りエラー🙉🐙")
 
     if text == "":
