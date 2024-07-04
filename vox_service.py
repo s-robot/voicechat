@@ -5,7 +5,7 @@ import uuid
 import requests
 import simpleaudio as sa
 
-import gpt_env
+import settings
 
 
 class VoxService:
@@ -14,7 +14,7 @@ class VoxService:
 
     def speakers(self):
         response1 = requests.get(
-            f"http://{gpt_env.vox_url}:{gpt_env.vox_port}/speakers",
+            f"http://{settings.VOX_URL}:{settings.VOX_PORT}/speakers",
         )
         result = json.loads(s=response1.content)
         for speaker in result:
@@ -29,7 +29,7 @@ class VoxService:
         )
         try:
             response1 = requests.post(
-                f"http://{gpt_env.vox_url}:{gpt_env.vox_port}/audio_query",
+                f"http://{settings.VOX_URL}:{settings.VOX_PORT}/audio_query",
                 params=params,
             )
         except:
@@ -39,7 +39,7 @@ class VoxService:
         headers = {"Content-Type": "application/json"}
         try:
             response2 = requests.post(
-                f"http://{gpt_env.vox_url}:{gpt_env.vox_port}/synthesis",
+                f"http://{settings.VOX_URL}:{settings.VOX_PORT}/synthesis",
                 headers=headers,
                 params=params,
                 data=json.dumps(response1.json()),
@@ -49,9 +49,6 @@ class VoxService:
 
         buff = io.BytesIO(response2.content)
         buff.seek(0)
-        # wave_obj = sa.WaveObject.from_wave_file(buff)
-        # play_obj = wave_obj.play()
-        # play_obj.wait_done()
 
         # ローカルに保存する場合
         if save:
@@ -64,5 +61,7 @@ class VoxService:
 
 if __name__ == "__main__":
     vs = VoxService()
-    # vs.speakers()
-    vs.voxvoice("隣の客はよく柿食う客だ", 0)
+    buff = vs.voxvoice("隣の客はよく柿食う客だ", 0)
+    wave_obj = sa.WaveObject.from_wave_file(buff)
+    play_obj = wave_obj.play()
+    play_obj.wait_done()

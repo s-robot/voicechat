@@ -3,7 +3,9 @@ import time
 from typing import Generator
 
 import openai
-from openai.types.chat import ChatCompletion, ChatCompletionAssistantMessageParam, ChatCompletionChunk, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam
+from openai.types.chat import ChatCompletionAssistantMessageParam, ChatCompletionMessageParam, ChatCompletionSystemMessageParam, ChatCompletionUserMessageParam
+
+import settings
 
 
 class GptServiceError(Exception):
@@ -16,7 +18,7 @@ class GptServiceError(Exception):
 
 class GptService:
     def __init__(self) -> None:
-        openai.api_key = "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"
+        openai.api_key = settings.OPENAI_KEY
         self.messages: list[ChatCompletionMessageParam] = []
 
     def system_message(self, content: str):
@@ -57,7 +59,7 @@ class GptService:
                     raise GptServiceError()
         raise GptServiceError()
 
-    def onetime(self, input: str, prompt: str = "You are a helpful assistant.", model="gpt-4-turbo-2024-04-09") -> str:
+    def onetime(self, input: str, prompt: str = "You are a helpful assistant.", model="gpt-4o") -> str:
         messages: list[ChatCompletionMessageParam] = []
         messages.append(self.system_message(prompt))
         messages.append(self.user_message(input))
@@ -69,7 +71,7 @@ class GptService:
             result = ""
         return result
 
-    def chat(self, input: str, prompt: str = "You are a helpful assistant.", model="gpt-4-turbo-2024-04-09"):
+    def chat(self, input: str, prompt: str = "You are a helpful assistant.", model="gpt-4o"):
         if self.messages == []:
             self.messages.append(self.system_message(prompt))
         self.messages.append(self.user_message(input))
@@ -99,7 +101,7 @@ if __name__ == "__main__":
     isStart = True
     start_time = time.perf_counter()
     gs = GptService()
-    res = gs.chat("SFCについて教えて", model="gpt-3.5-turbo-0125")
+    res = gs.chat("SFCについて教えて", model="gpt-4o")
     for r in res:
         print(r)
         if isStart:
