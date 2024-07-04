@@ -1,7 +1,7 @@
-import asyncio
 import random
 import threading
-from asyncio import Queue as AsyncQueue
+import time
+from queue import Queue
 from threading import Thread
 
 import pyaudio
@@ -30,42 +30,42 @@ def look_for_audio_input():
     pa.terminate()
 
 
-async def play_noun_or_fill(filler_queue: AsyncQueue):
+def play_noun_or_fill(filler_queue: Queue):
     if not filler_queue.empty():
         fetched_index, file = filler_queue.get_nowait()
         print(f"start play voice for index {fetched_index}")
-        await play_chat(file)
+        play_chat(file)
     else:
-        await play_fill()
+        play_fill()
 
 
-async def play_fill():
+def play_fill():
     fillvoices = ["そっかそっか", "そうかぁー", "そうだねー", "えっとぉー", "えっとねぇー", "うーんとね"]
     wave_obj = sa.WaveObject.from_wave_file(f"fill_voice/{random.choice(fillvoices)}.wav")
     play_obj = wave_obj.play()
     play_obj.wait_done()
 
 
-async def play_exit():
+def play_exit():
     exitvoices = ["じゃあね", "またね", "元気でね", "また話そうね", "バイバイ"]
     wave_obj = sa.WaveObject.from_wave_file(f"fill_voice/{random.choice(exitvoices)}.wav")
     play_obj = wave_obj.play()
     play_obj.wait_done()
 
 
-async def play_chat(file):
+def play_chat(file):
     wave_obj = sa.WaveObject.from_wave_file(file)
     play_obj = wave_obj.play()
     play_obj.wait_done()
 
 
-def fetch_voice(q: AsyncQueue, text, index):
+def fetch_voice(q: Queue, text, index):
     result = vs.voxvoice(text, 0)
     q.put_nowait((index, result))
     print(f"Fetched voice for index {index}")
 
 
-def create_noun_fill(q: AsyncQueue, text, index):
+def create_noun_fill(q: Queue, text, index):
     nlist = noun_list(text)
     print(nlist)
     if len(nlist) > 0:
@@ -76,7 +76,7 @@ def create_noun_fill(q: AsyncQueue, text, index):
         print(f"Add fetch nounfill: {nounfill}")
 
 
-def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, threads: list[Thread], error_queue: AsyncQueue, filler_queue: AsyncQueue):
+def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: Queue, threads: list[Thread], error_queue: Queue, filler_queue: Queue):
     text: str = ""
     try:
         text = recog.recognize_whisper_api(audio, model="whisper-1", api_key=settings.OPENAI_KEY)
@@ -109,10 +109,10 @@ def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: AsyncQueue, t
     gs.addres(result)
 
 
-async def process_text(recog: sr.Recognizer, audio: sr.AudioData) -> bool:
-    queue: AsyncQueue = AsyncQueue()
-    filler_queue: AsyncQueue = AsyncQueue()
-    error_queue: AsyncQueue = AsyncQueue()
+def process_text(recog: sr.Recognizer, audio: sr.AudioData) -> bool:
+    queue: Queue = Queue()
+    filler_queue: Queue = Queue()
+    error_queue: Queue = Queue()
     threads: list[Thread] = []
     played_indexes: set = set()
 
@@ -122,28 +122,28 @@ async def process_text(recog: sr.Recognizer, audio: sr.AudioData) -> bool:
     # フェッチした音声を順に再生
     isFirst = True
     while isFirst and error_queue.empty():
-        await play_noun_or_fill(filler_queue)
+        play_noun_or_fill(filler_queue)
         while any(thread.is_alive() for thread in threads) or not queue.empty():
             if not queue.empty():
                 fetched_index, file = queue.get_nowait()
                 if fetched_index == len(played_indexes):
                     isFirst = False
                     print(f"start play voice for index {fetched_index}")
-                    await play_chat(file)
+                    play_chat(file)
                     played_indexes.add(fetched_index)
                 else:
                     queue.put_nowait((fetched_index, file))
-            await asyncio.sleep(0.1)
+            time.sleep(0.1)
     while not error_queue.empty():
         e = error_queue.get_nowait()
         print(e)
         if e == "👋see you!!👋":
-            await play_exit()
+            play_exit()
             return False
     return True
 
 
-async def realtime_textise():
+def realtime_textise():
     # 音声入力
     is_runing = True
     while is_runing:
@@ -152,13 +152,13 @@ async def realtime_textise():
         with sr.Microphone() as source:
             print("発話どうぞ💬")
             audio = r.listen(source)
-        is_runing = await process_text(r, audio)
+        is_runing = process_text(r, audio)
 
 
-async def main():
+def main():
     look_for_audio_input()
-    await realtime_textise()
+    realtime_textise()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
