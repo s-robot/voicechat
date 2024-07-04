@@ -145,20 +145,16 @@ def process_text(recog: sr.Recognizer, audio: sr.AudioData) -> bool:
 
 def realtime_textise():
     # 音声入力
-    is_runing = True
-    while is_runing:
+    while True:
         r = sr.Recognizer()
         r.energy_threshold = 1000
         with sr.Microphone() as source:
             print("発話どうぞ💬")
             audio = r.listen(source)
-        is_runing = process_text(r, audio)
-
-
-def main():
-    look_for_audio_input()
-    realtime_textise()
+        if not process_text(r, audio):
+            break
 
 
 if __name__ == "__main__":
-    main()
+    look_for_audio_input()
+    realtime_textise()
