@@ -1,9 +1,10 @@
 import io
 import json
 import uuid
+import wave
 
+import pyaudio
 import requests
-import simpleaudio as sa
 
 import settings
 
@@ -62,6 +63,21 @@ class VoxService:
 if __name__ == "__main__":
     vs = VoxService()
     buff = vs.voxvoice("隣の客はよく柿食う客だ", 0)
-    wave_obj = sa.WaveObject.from_wave_file(buff)
-    play_obj = wave_obj.play()
-    play_obj.wait_done()
+    buff.seek(0)
+    wf = wave.open(buff, 'rb')
+    pa = pyaudio.PyAudio()
+    stream = pa.open(
+        format=pa.get_format_from_width(wf.getsampwidth()),
+        channels=wf.getnchannels(),
+        rate=wf.getframerate(),
+        output=True
+    )
+    chunk = 1024
+    data = wf.readframes(chunk)
+    while data:
+        stream.write(data)
+        data = wf.readframes(chunk)
+    stream.stop_stream()
+    stream.close()
+    pa.terminate()
+    wf.close()

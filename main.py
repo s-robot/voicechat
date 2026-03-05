@@ -1,12 +1,13 @@
+import io
 import os
 import random
 import threading
 import time
+import wave
 from queue import Queue
 from threading import Thread
 
 import pyaudio
-import simpleaudio as sa
 import speech_recognition as sr
 
 import settings
@@ -42,24 +43,46 @@ def play_noun_or_fill(filler_queue: Queue):
         play_fill()
 
 
+def play_wav(source):
+    """wavファイルまたはBytesIOを再生する"""
+    if isinstance(source, io.BytesIO):
+        source.seek(0)
+        wf = wave.open(source, 'rb')
+    else:
+        wf = wave.open(source, 'rb')
+
+    pa = pyaudio.PyAudio()
+    stream = pa.open(
+        format=pa.get_format_from_width(wf.getsampwidth()),
+        channels=wf.getnchannels(),
+        rate=wf.getframerate(),
+        output=True
+    )
+
+    chunk = 1024
+    data = wf.readframes(chunk)
+    while data:
+        stream.write(data)
+        data = wf.readframes(chunk)
+
+    stream.stop_stream()
+    stream.close()
+    pa.terminate()
+    wf.close()
+
+
 def play_fill():
     fillvoices = ["そっかそっか", "そうかぁー", "そうだねー", "えっとぉー", "えっとねぇー", "うーんとね"]
-    wave_obj = sa.WaveObject.from_wave_file(f"fill_voice/{random.choice(fillvoices)}.wav")
-    play_obj = wave_obj.play()
-    play_obj.wait_done()
+    play_wav(f"fill_voice/{random.choice(fillvoices)}.wav")
 
 
 def play_exit():
     exitvoices = ["じゃあね", "またね", "元気でね", "また話そうね", "バイバイ"]
-    wave_obj = sa.WaveObject.from_wave_file(f"fill_voice/{random.choice(exitvoices)}.wav")
-    play_obj = wave_obj.play()
-    play_obj.wait_done()
+    play_wav(f"fill_voice/{random.choice(exitvoices)}.wav")
 
 
 def play_chat(file):
-    wave_obj = sa.WaveObject.from_wave_file(file)
-    play_obj = wave_obj.play()
-    play_obj.wait_done()
+    play_wav(file)
 
 
 def fetch_voice(q: Queue, text, index):
