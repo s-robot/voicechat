@@ -1,3 +1,4 @@
+import os
 import random
 import threading
 import time
@@ -9,6 +10,8 @@ import simpleaudio as sa
 import speech_recognition as sr
 
 import settings
+
+os.environ["OPENAI_API_KEY"] = settings.OPENAI_KEY or ""
 from gpt_service import GptService
 from noun_service import noun_list
 from vox_service import VoxService
@@ -79,7 +82,7 @@ def create_noun_fill(q: Queue, text, index):
 def text_fetcher(recog: sr.Recognizer, audio: sr.AudioData, queue: Queue, threads: list[Thread], error_queue: Queue, filler_queue: Queue):
     text: str = ""
     try:
-        text = recog.recognize_whisper_api(audio, model="whisper-1", api_key=settings.OPENAI_KEY)
+        text = recog.recognize_openai(audio, model="whisper-1")  # type: ignore
     except Exception as e:
         print(f"Error: {e}")
         error_queue.put_nowait("🐙🙉聞き取りエラー🙉🐙")
